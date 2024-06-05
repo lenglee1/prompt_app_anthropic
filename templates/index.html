@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Get Prompt Help</title>
+    <style>
+        .question-box, .response-box, .summary-box, .final-response-box {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        .question-box label, .question-box textarea {
+            display: block;
+            width: 100%;
+            margin-top: 10px;
+        }
+        .response-box p, .summary-box p, .final-response-box p {
+            margin: 10px 0;
+        }
+        .separator {
+            margin: 20px 0;
+            border-top: 1px solid #ccc;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>Get Prompt Help</h1>
+    <form id="promptForm">
+        <label for="prompt">Enter your prompt:</label>
+        <textarea id="prompt" name="prompt" rows="3" required></textarea>
+        <button type="submit">Send</button>
+    </form>
+    <div id="response" class="response-box"></div>
+    <div id="questionFormContainer" class="question-box hidden"></div>
+    <div id="summaryContainer" class="hidden">
+        <div id="summary" class="summary-box">
+            <h2>Prompt Requirements and Suggested Persona</h2>
+            <div id="summaryContent"></div>
+        </div>
+    </div>
+    <div id="finalResponse" class="hidden final-response-box">
+        <h2>Final Output</h2>
+        <div id="finalResponseContent"></div>
+    </div>
+
+    <script>
+        document.getElementById('promptForm').addEventListener('submit', async function (event) {
+            event.preventDefault();
+            const prompt = document.getElementById('prompt').value;
+
+            try {
+                const response = await fetch('/ask', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ prompt: prompt })
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    displayResponse(data.response, false);
+                    if (data.summary && data.final_response) {
+                        displaySummary(data.summary);
+                        displayFinalResponse(data.final_response);
+                        document.getElementById('summaryContainer').classList.remove('hidden');
+                        document.getElementById('finalResponse').classList.remove('hidden');
+                    } else {
+                        addQuestionFields(data.response);
+                        document.getElementById('questionFormContainer').classList.remove('hidden');
+                    }
+                } else {
+                    document.getElementById('response').innerText = 'Error: ' + data.error;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('response').innerText = 'An error occurred';
+            }
+        });
+
+        function displayResponse(response, append) {
+            const responseContainer = document.getElementById('response');
+            if (!append) {
+                responseContainer.innerText = '';
+            }
+            const p = document.createElement('p');
+            p.innerText = response;
+            responseContainer.appendChild(p);
+        }
+
+        function addQuestionFields(response) {
+            const questionFormContainer = document.getElementById('questionFormContainer');
+            questionFormContainer.innerHTML = ''; // Clear previous questions
+
+            const question = response.trim().endsWith('?') ? response : response + '?';
+            const p = document.createElement('p');
+            p.innerText = question;
+            questionFormContainer.appendChild(p);
+
+            const textArea = document.createElement('textarea');
+            textArea.id = 'answer';
+            textArea.name = 'answer';
+            textArea.rows = 2;
+            textArea.placeholder = 'Answer the question here...';
+            questionFormContainer.appendChild(textArea);
+
+            const submitButton = document.createElement('button');
+            submitButton.type = 'button';
+            submitButton.innerText = 'Submit Answer';
+            submitButton.onclick = submitAnswer;
+            questionFormContainer.appendChild(submitButton);
+        }
+
+        function displaySummary(summary) {
+            const summaryContainer = document.getElementById('summaryContent');
+            summaryContainer.innerHTML = `<p>${summary}</p>`;
+        }
+
+        async function submitAnswer() {
+            const answer = document.getElementById('answer').value.trim();
+            if (answer !== '') {
+                try {
+                    const response = await fetch('/ask', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ prompt: answer })
+                    });
+
+                    const data = await response.json();
+                    if (response.ok) {
+                        displayResponse(data.response, true);
+                        if (data.summary && data.final_response) {
+                            displaySummary(data.summary);
+                            displayFinalResponse(data.final_response);
+                            document.getElementById('summaryContainer').classList.remove('hidden');
+                            document.getElementById('finalResponse').classList.remove('hidden');
+                        } else {
+                            addQuestionFields(data.response);
+                        }
+                    } else {
+                        document.getElementById('response').innerText = 'Error: ' + data.error;
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    document.getElementById('response').innerText = 'An error occurred';
+                }
+            } else {
+                alert('Please answer the question before submitting.');
+            }
+        }
+
+        function displayFinalResponse(response) {
+            const finalResponseContainer = document.getElementById('finalResponseContent');
+            finalResponseContainer.innerHTML = `<p>${response}</p>`;
+        }
+    </script>
+</body>
+</html>
